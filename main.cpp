@@ -1,120 +1,118 @@
 #include <iostream>
 #include <fstream>
-#include <sstream>
 #include <vector>
-#include <opencv2/opencv.hpp>
 #include <CL/cl2.hpp>
-
-std::string readKernelSource(const std::string& filename) {
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        throw std::runtime_error("Failed to open kernel source file: " + filename);
-    }
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
-}
+#include <opencv2/opencv.hpp>
 
 int main() {
-    try {
-        // Read input image
-        cv::Mat inputImage = cv::imread("../input.png");
-        if (inputImage.empty()) {
-            throw std::runtime_error("Failed to load input image!");
-        }
-        std::cout << "Input image loaded successfully." << std::endl;
-
-        // Convert input image to grayscale
-        cv::Mat grayscaleImage;
-        cv::cvtColor(inputImage, grayscaleImage, cv::COLOR_BGR2GRAY);
-
-        // Save grayscale image
-        cv::imwrite("../grey.png", grayscaleImage);
-        std::cout << "Grayscale image conversion completed." << std::endl;
-
-        // Get image dimensions
-        int width = grayscaleImage.cols;
-        int height = grayscaleImage.rows;
-
-        // Load kernel source code
-        std::string kernelSource = readKernelSource("../sobel_kernel.cl");
-        std::cout << "Kernel source code loaded successfully." << std::endl;
-
-        // Get available platforms
-        std::vector<cl::Platform> platforms;
-        cl::Platform::get(&platforms);
-        if (platforms.empty()) {
-            throw std::runtime_error("No OpenCL platforms found");
-        }
-
-        // Select the first platform
-        cl::Platform platform = platforms[0];
-        std::cout << "Selected platform: " << platform.getInfo<CL_PLATFORM_NAME>() << std::endl;
-
-        // Get available devices on the selected platform
-        std::vector<cl::Device> devices;
-        platform.getDevices(CL_DEVICE_TYPE_ALL, &devices);
-        if (devices.empty()) {
-            throw std::runtime_error("No OpenCL devices found on platform");
-        }
-
-        // Select the first device
-        cl::Device device = devices[0];
-        std::cout << "Selected device: " << device.getInfo<CL_DEVICE_NAME>() << std::endl;
-
-        // Create a context for the selected device
-        cl::Context context(device);
-
-        // Create a command queue
-        cl::CommandQueue queue(context, device);
-
-        // Create the program from the kernel source code
-        cl::Program program(context, kernelSource);
-
-        // Build the program for the selected device
-        try {
-            program.build({device});
-        } catch (...) {
-            std::string log = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device);
-            throw std::runtime_error("Failed to build OpenCL program: " + log);
-        }
-        std::cout << "OpenCL program built successfully." << std::endl;
-
-        // Create an input buffer
-        cl::Buffer inputBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, width * height * sizeof(uchar), grayscaleImage.data);
-
-        // Create an output buffer
-        cl::Buffer outputBuffer(context, CL_MEM_WRITE_ONLY, width * height * sizeof(uchar));
-
-        // Create a kernel
-        cl::Kernel kernel(program, "sobel");
-
-        // Set kernel arguments
-        kernel.setArg(0, inputBuffer);
-        kernel.setArg(1, outputBuffer);
-        kernel.setArg(2, width);
-        kernel.setArg(3, height);
-
-        // Enqueue the kernel for execution
-        queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(width, height), cl::NullRange);
-        std::cout << "OpenCL kernel enqueued for execution." << std::endl;
-
-        // Read the output buffer back to the host
-        std::vector<uchar> outputData(width * height);
-        queue.enqueueReadBuffer(outputBuffer, CL_TRUE, 0, width * height * sizeof(uchar), outputData.data());
-        std::cout << "Output data read back to host." << std::endl;
-
-        // Create the output image
-        cv::Mat outputImage(height, width, CV_8UC1, outputData.data());
-
-        // Save the output image
-        cv::imwrite("../output.png", outputImage);
-        std::cout << "Sobel edge detection result saved as output.png" << std::endl;
-
-    } catch (const std::exception& ex) {
-        std::cerr << "An error occurred: " << ex.what() << std::endl;
+    // Load the kernel source code from a file
+    std::ifstream kernelFile("../brightness_kernel.cl");
+    if (!kernelFile.is_open()) {
+        std::cerr << "Failed to open kernel file." << std::endl;
         return 1;
     }
+
+    std::string kernelSource((std::istreambuf_iterator<char>(kernelFile)), std::istreambuf_iterator<char>());
+
+    // Get available OpenCL platforms
+    std::vector<cl::Platform> platforms;
+    cl::Platform::get(&platforms);
+    if (platforms.empty()) {
+        std::cerr << "No OpenCL platforms found." << std::endl;
+        return 1;
+    }
+
+    // Log available platforms
+    std::cout << "Available OpenCL Platforms:" << std::endl;
+    for (const auto& platform : platforms) {
+        std::cout << "Platform: " << platform.getInfo<CL_PLATFORM_NAME>() << std::endl;
+    }
+
+    // Select the first platform
+    cl::Platform platform = platforms[0];
+
+    // Get available devices for the platform
+    std::vector<cl::Device> devices;
+    platform.getDevices(CL_DEVICE_TYPE_ALL, &devices);
+    if (devices.empty()) {
+        std::cerr << "No OpenCL devices found." << std::endl;
+        return 1;
+    }
+
+    // Log available devices
+    std::cout << "Available OpenCL Devices:" << std::endl;
+    for (const auto& device : devices) {
+        std::cout << "Device: " << device.getInfo<CL_DEVICE_NAME>() << std::endl;
+    }
+
+    // Select the first device
+    cl::Device device = devices[0];
+
+    // Create an OpenCL context for the selected device
+    cl::Context context({device});
+
+    // Create a command queue
+    cl::CommandQueue queue(context, device);
+
+    // Create a program from the kernel source code
+    cl::Program program(context, kernelSource);
+    if (program.build({device}) != CL_SUCCESS) {
+        std::cerr << "Failed to build the OpenCL program." << std::endl;
+        std::cerr << "Build log: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << std::endl;
+        return 1;
+    }
+
+    // Load the input image using OpenCV
+    cv::Mat inputImage = cv::imread("../input.png", cv::IMREAD_GRAYSCALE);
+
+    if (inputImage.empty()) {
+        std::cerr << "Failed to load input image." << std::endl;
+        return 1;
+    }
+
+    // Define the image dimensions
+    int width = inputImage.cols;
+    int height = inputImage.rows;
+
+    // Compute the total number of pixels
+    int numPixels = width * height;
+
+    // Create input and output buffers on the device
+    cl::Buffer inputBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(uchar) * numPixels, inputImage.data);
+    cl::Buffer outputBuffer(context, CL_MEM_WRITE_ONLY, sizeof(uchar) * numPixels);
+
+    // Create a kernel object
+    cl::Kernel kernel(program, "brightness");
+
+    // Set kernel arguments
+    kernel.setArg(0, inputBuffer);
+    kernel.setArg(1, outputBuffer);
+    kernel.setArg(2, width);
+    kernel.setArg(3, height);
+    kernel.setArg(4, 30);  // Adjust brightness value as desired
+
+    // Enqueue the kernel for execution
+    cl::NDRange globalSize(width, height);
+    queue.enqueueNDRangeKernel(kernel, cl::NullRange, globalSize);
+
+    // Read the output image data from the device to the host
+    std::vector<uchar> outputImage(numPixels);
+    queue.enqueueReadBuffer(outputBuffer, CL_TRUE, 0, sizeof(uchar) * numPixels, outputImage.data());
+
+    // Create a cv::Mat object from the output image data
+    cv::Mat outputImageMat(height, width, CV_8UC1, outputImage.data());
+
+    // Save the output image using OpenCV
+    cv::imwrite("../output.png", outputImageMat);
+
+    // Print information about the output image
+    std::cout << "Output Image Information:" << std::endl;
+    std::cout << "Rows: " << outputImageMat.rows << std::endl;
+    std::cout << "Columns: " << outputImageMat.cols << std::endl;
+    std::cout << "Min Pixel Value: " << static_cast<int>(*std::min_element(outputImageMat.begin<uchar>(), outputImageMat.end<uchar>())) << std::endl;
+    std::cout << "Max Pixel Value: " << static_cast<int>(*std::max_element(outputImageMat.begin<uchar>(), outputImageMat.end<uchar>())) << std::endl;
+
+    std::cout << "Brightness adjustment completed." << std::endl;
 
     return 0;
 }
