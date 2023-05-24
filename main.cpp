@@ -79,11 +79,15 @@ int main() {
     // Create a kernel object
     cl::Kernel kernel(program, "sobel");
 
+    float threshholdX = 1.0f;
+    float threshholdY = 1.0f;
     // Set kernel arguments
     kernel.setArg(0, inputBuffer);
     kernel.setArg(1, outputBuffer);
     kernel.setArg(2, width);
     kernel.setArg(3, height);
+    kernel.setArg(4, threshholdX);
+    kernel.setArg(5, threshholdY);
 
     // Enqueue the kernel for execution
     cl::NDRange globalSize(width, height);
