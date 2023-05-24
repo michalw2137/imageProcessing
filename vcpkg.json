@@ -1,0 +1,12 @@
+{
+  "name" : "opencl",
+  "version-string" : "1.0.0",
+  "builtin-baseline" : "2718aa52a31977b792af7e9c2f83eaf4ddcd932d",
+  "dependencies" : [ {
+    "name" : "opencv2",
+    "version>=" : "2.4.13.7#18"
+  }, {
+    "name" : "opencl",
+    "version>=" : "v2023.02.06"
+  } ]
+}
