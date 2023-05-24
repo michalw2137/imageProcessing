@@ -58,46 +58,40 @@ int main() {
     cl::Program program(context, kernelSource);
     if (program.build({device}) != CL_SUCCESS) {
         std::cerr << "Failed to build the OpenCL program." << std::endl;
-        std::cerr << "Build log: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << std::endl;
+        std::cerr << "Build Log: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << std::endl;
         return 1;
     }
 
     // Load the input image using OpenCV
     cv::Mat inputImage = cv::imread("../input.png", cv::IMREAD_GRAYSCALE);
-
     if (inputImage.empty()) {
-        std::cerr << "Failed to load input image." << std::endl;
+        std::cerr << "Failed to load the input image." << std::endl;
         return 1;
     }
 
-    // Define the image dimensions
     int width = inputImage.cols;
     int height = inputImage.rows;
 
-    // Compute the total number of pixels
-    int numPixels = width * height;
-
     // Create input and output buffers on the device
-    cl::Buffer inputBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(uchar) * numPixels, inputImage.data);
-    cl::Buffer outputBuffer(context, CL_MEM_WRITE_ONLY, sizeof(uchar) * numPixels);
+    cl::Buffer inputBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(uchar) * width * height, inputImage.data);
+    cl::Buffer outputBuffer(context, CL_MEM_WRITE_ONLY, sizeof(uchar) * width * height);
 
     // Create a kernel object
-    cl::Kernel kernel(program, "brightness");
+    cl::Kernel kernel(program, "sobel");
 
     // Set kernel arguments
     kernel.setArg(0, inputBuffer);
     kernel.setArg(1, outputBuffer);
     kernel.setArg(2, width);
     kernel.setArg(3, height);
-    kernel.setArg(4, 30);  // Adjust brightness value as desired
 
     // Enqueue the kernel for execution
     cl::NDRange globalSize(width, height);
     queue.enqueueNDRangeKernel(kernel, cl::NullRange, globalSize);
 
     // Read the output image data from the device to the host
-    std::vector<uchar> outputImage(numPixels);
-    queue.enqueueReadBuffer(outputBuffer, CL_TRUE, 0, sizeof(uchar) * numPixels, outputImage.data());
+    std::vector<uchar> outputImage(width * height);
+    queue.enqueueReadBuffer(outputBuffer, CL_TRUE, 0, sizeof(uchar) * width * height, outputImage.data());
 
     // Create a cv::Mat object from the output image data
     cv::Mat outputImageMat(height, width, CV_8UC1, outputImage.data());
@@ -112,7 +106,7 @@ int main() {
     std::cout << "Min Pixel Value: " << static_cast<int>(*std::min_element(outputImageMat.begin<uchar>(), outputImageMat.end<uchar>())) << std::endl;
     std::cout << "Max Pixel Value: " << static_cast<int>(*std::max_element(outputImageMat.begin<uchar>(), outputImageMat.end<uchar>())) << std::endl;
 
-    std::cout << "Brightness adjustment completed." << std::endl;
+    std::cout << "Sobel edge detection completed." << std::endl;
 
     return 0;
 }

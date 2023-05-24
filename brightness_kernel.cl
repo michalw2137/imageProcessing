@@ -1,13 +1,16 @@
-__kernel void brightness(__global uchar* input, __global uchar* output, int width, int height, int brightnessValue)
+__kernel void sobel(__global uchar* input, __global uchar* output, int width, int height)
 {
     int x = get_global_id(0);
     int y = get_global_id(1);
 
-    int index = y * width + x;
+    int dx = -1 * input[(y - 1) * width + (x - 1)] + -2 * input[y * width + (x - 1)] + -1 * input[(y + 1) * width + (x - 1)] +
+             input[(y - 1) * width + (x + 1)] + 2 * input[y * width + (x + 1)] + input[(y + 1) * width + (x + 1)];
 
-    if (x < width && y < height)
-    {
-        uchar pixel = input[index];
-        output[index] = clamp(pixel + brightnessValue, 0, 255);
-    }
+    int dy = -1 * input[(y - 1) * width + (x - 1)] + -2 * input[(y - 1) * width + x] + -1 * input[(y - 1) * width + (x + 1)] +
+             input[(y + 1) * width + (x - 1)] + 2 * input[(y + 1) * width + x] + input[(y + 1) * width + (x + 1)];
+
+    float dxFloat = convert_float(dx);
+    float dyFloat = convert_float(dy);
+
+    output[y * width + x] = convert_uchar(sqrt(dxFloat * dxFloat + dyFloat * dyFloat));
 }
