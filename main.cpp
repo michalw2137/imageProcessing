@@ -37,7 +37,7 @@ void generateOutputImage(cl::CommandQueue& queue, cl::Buffer& outputBuffer, cl::
     outputImage.convertTo(outputImage, CV_8UC1, 255.0 / (maxVal - minVal), -minVal); // apply normalization
 
     std::stringstream ss;
-    ss << outputPath << "horizontal" << "_" << thresholdX << "_" << thresholdY << ".png";
+    ss << outputPath << "output" << "_" << thresholdX << "_" << thresholdY << ".png";
     std::string outputFilename = ss.str();
 
     // Save the output image with the provided filename
@@ -49,7 +49,7 @@ void generateOutputImage(cl::CommandQueue& queue, cl::Buffer& outputBuffer, cl::
 int main() {
     try {
         // Read input image
-        cv::Mat inputImage = cv::imread("../input/horizontal.png");
+        cv::Mat inputImage = cv::imread("../input/input.png");
         if (inputImage.empty()) {
             throw std::runtime_error("Failed to load input image!");
         }
@@ -58,9 +58,6 @@ int main() {
         // Convert input image to grayscale
         cv::Mat grayscaleImage;
         cv::cvtColor(inputImage, grayscaleImage, cv::COLOR_BGR2GRAY);
-
-        // Save grayscale image
-        cv::imwrite("../output/grey.png", grayscaleImage);
         std::cout << "Grayscale image conversion completed." << std::endl;
 
         // Get image dimensions
@@ -131,6 +128,12 @@ int main() {
         generateOutputImage(queue, outputBuffer, kernel, width, height, "../output/asym/", 0, 1);
         generateOutputImage(queue, outputBuffer, kernel, width, height, "../output/asym/", 1, 0);
         generateOutputImage(queue, outputBuffer, kernel, width, height, "../output/asym/", 1, 1);
+
+        generateOutputImage(queue, outputBuffer, kernel, width, height, "../output/negative/", -1, -1);
+        generateOutputImage(queue, outputBuffer, kernel, width, height, "../output/negative/", 1, 1);
+        generateOutputImage(queue, outputBuffer, kernel, width, height, "../output/negative/", 0, -1);
+        generateOutputImage(queue, outputBuffer, kernel, width, height, "../output/negative/", 0, 1);
+
         generateOutputImage(queue, outputBuffer, kernel, width, height, "../output/strength/", 0.1f, 0.1f);
         generateOutputImage(queue, outputBuffer, kernel, width, height, "../output/strength/", 0.5f, 0.5f);
         generateOutputImage(queue, outputBuffer, kernel, width, height, "../output/strength/", 1, 1);
